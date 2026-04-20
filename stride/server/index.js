@@ -7,6 +7,8 @@ import authRoutes from './routes/auth.js';
 import activitiesRoutes from './routes/activities.js';
 import { fetchActivities, fetchActivity, filterRuns, speedToPace, metresToKm, formatDuration } from './services/stravaService.js';
 import coachRoutes from './routes/coach.js';
+import reportsRoutes from './routes/reports.js';
+import { startReportScheduler } from './services/reportScheduler.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -31,11 +33,12 @@ app.get('/health', (req, res) => res.json({ status: 'ok' }));
 app.use('/auth', authRoutes);  
 app.use('/activities', activitiesRoutes);
 app.use('/coach', coachRoutes); 
+app.use('/reports', reportsRoutes);
 
 
-// Boot
 initDb()
   .then(() => {
+     startReportScheduler();
     app.listen(PORT, () => {
       console.log(`Stride server running on port ${PORT}`);
     });
