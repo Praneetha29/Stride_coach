@@ -3,6 +3,7 @@ import express from 'express';
 import cors from 'cors';
 import session from 'express-session';
 import { initDb } from './utils/db.js';
+import authRoutes from './routes/auth.js'; 
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -24,6 +25,7 @@ app.use(session({
 }));
 
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
+app.use('/auth', authRoutes);  
 
 // Boot
 initDb()
