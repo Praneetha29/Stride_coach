@@ -6,7 +6,7 @@ import { initDb } from './utils/db.js';
 import authRoutes from './routes/auth.js'; 
 import activitiesRoutes from './routes/activities.js';
 import { fetchActivities, fetchActivity, filterRuns, speedToPace, metresToKm, formatDuration } from './services/stravaService.js';
-import { classifyRun } from './services/dataProcessor.js'; 
+import coachRoutes from './routes/coach.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -30,6 +30,7 @@ app.use(session({
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
 app.use('/auth', authRoutes);  
 app.use('/activities', activitiesRoutes);
+app.use('/coach', coachRoutes); 
 
 
 // Boot
