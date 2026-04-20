@@ -5,6 +5,8 @@ import session from 'express-session';
 import { initDb } from './utils/db.js';
 import authRoutes from './routes/auth.js'; 
 import activitiesRoutes from './routes/activities.js';
+import { fetchActivities, fetchActivity, filterRuns, speedToPace, metresToKm, formatDuration } from './services/stravaService.js';
+import { classifyRun } from './services/dataProcessor.js'; 
 
 const app = express();
 const PORT = process.env.PORT || 3001;

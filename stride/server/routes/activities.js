@@ -1,6 +1,7 @@
 import express from 'express';
 import { fetchActivities, fetchActivity, filterRuns, speedToPace, metresToKm, formatDuration } from '../services/stravaService.js';
 import { pool } from '../utils/db.js';
+import { classifyRun } from '../services/dataProcessor.js'; 
 
 const router = express.Router();
 
@@ -79,6 +80,7 @@ function formatActivity(a) {
     cadence: raw.average_cadence ? Math.round(raw.average_cadence * 2) : null,
     mapPolyline: raw.map?.summary_polyline || a.map_polyline || null,
     coachOneliner: a.coach_oneliner || null,
+    hrZone: classifyRun(raw.average_heartrate),
   };
 }
 
