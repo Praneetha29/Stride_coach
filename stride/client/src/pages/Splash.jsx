@@ -24,8 +24,8 @@ export default function Splash() {
           ))}
         </div>
 
-        <a href={`${import.meta.env.VITE_API_URL}/auth/strava`} style={styles.stravaBtn}>
-         <StravaIcon />
+        <a href="https://stridecoach-production.up.railway.app/auth/strava" style={styles.stravaBtn}>
+        <StravaIcon />
         connect with strava
         </a>
         <p style={styles.fine}>we only read your activity data. we never post on your behalf.</p>
