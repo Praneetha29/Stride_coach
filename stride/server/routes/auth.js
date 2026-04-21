@@ -28,7 +28,6 @@ router.get('/strava/callback', async (req, res) => {
   }
 
   try {
-    // Exchange code for tokens
     const tokenRes = await axios.post(STRAVA_TOKEN_URL, {
       client_id: process.env.STRAVA_CLIENT_ID,
       client_secret: process.env.STRAVA_CLIENT_SECRET,
@@ -38,7 +37,6 @@ router.get('/strava/callback', async (req, res) => {
 
     const { access_token, refresh_token, expires_at, athlete } = tokenRes.data;
 
-    // Save user to DB
     const result = await pool.query(`
       INSERT INTO users (strava_id, name, profile_pic, access_token, refresh_token, token_expires_at)
       VALUES ($1, $2, $3, $4, $5, $6)
@@ -56,10 +54,17 @@ router.get('/strava/callback', async (req, res) => {
       expires_at,
     ]);
 
-    // Drop session cookie
     req.session.userId = result.rows[0].id;
 
-    res.redirect(`${process.env.CLIENT_URL}?auth=success`);
+    // Save session explicitly before redirecting
+    req.session.save((err) => {
+      if (err) {
+        console.error('Session save error:', err);
+        return res.redirect(`${process.env.CLIENT_URL}?error=session_failed`);
+      }
+      res.redirect(`${process.env.CLIENT_URL}?auth=success&uid=${result.rows[0].id}`);
+    });
+
   } catch (err) {
     console.error('Strava OAuth error:', err.response?.data || err.message);
     res.redirect(`${process.env.CLIENT_URL}?error=auth_failed`);
