@@ -21,9 +21,16 @@ export function AuthProvider({ children }) {
   const params = new URLSearchParams(window.location.search);
   if (params.get('auth') === 'success') {
     window.history.replaceState({}, '', '/');
-    setTimeout(() => {
-      getMe().then(setUser).catch(() => {});
-    }, 500);
+    let attempts = 0;
+    const tryGetMe = () => {
+      attempts++;
+      getMe()
+        .then(setUser)
+        .catch(() => {
+          if (attempts < 5) setTimeout(tryGetMe, 800);
+        });
+    };
+    setTimeout(tryGetMe, 300);
   }
 }, []);
 
