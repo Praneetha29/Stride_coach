@@ -2,16 +2,9 @@ import express from 'express';
 import { pool } from '../utils/db.js';
 import { buildWeeklySummary, groupByWeek, predictRaceTime } from '../services/dataProcessor.js';
 import { generateWeeklyReport } from '../services/claudeService.js';
+import { requireAuth } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
-
-async function requireAuth(req, res, next) {
-  if (!req.session.userId) return res.status(401).json({ error: 'Not authenticated' });
-  const result = await pool.query('SELECT * FROM users WHERE id = $1', [req.session.userId]);
-  if (!result.rows[0]) return res.status(401).json({ error: 'User not found' });
-  req.user = result.rows[0];
-  next();
-}
 
 // GET /reports
 router.get('/', requireAuth, async (req, res) => {

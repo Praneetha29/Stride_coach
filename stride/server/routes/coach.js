@@ -5,14 +5,6 @@ import { requireAuth } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
-async function requireAuth(req, res, next) {
-  if (!req.session.userId) return res.status(401).json({ error: 'Not authenticated' });
-  const result = await pool.query('SELECT * FROM users WHERE id = $1', [req.session.userId]);
-  if (!result.rows[0]) return res.status(401).json({ error: 'User not found' });
-  req.user = result.rows[0];
-  next();
-}
-
 // POST /coach/chat/:activityId
 router.post('/chat/:activityId', requireAuth, async (req, res) => {
   const { message, history = [], coachMode = 'fire' } = req.body;

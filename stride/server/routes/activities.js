@@ -1,25 +1,15 @@
 import express from 'express';
 import { fetchActivities, fetchActivity, filterRuns, speedToPace, metresToKm, formatDuration } from '../services/stravaService.js';
 import { pool } from '../utils/db.js';
-import { classifyRun } from '../services/dataProcessor.js'; 
+import { classifyRun } from '../services/dataProcessor.js';
 import { requireAuth } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
-
-// simple auth guard inline for now
-async function requireAuth(req, res, next) {
-  if (!req.session.userId) return res.status(401).json({ error: 'Not authenticated' });
-  const result = await pool.query('SELECT * FROM users WHERE id = $1', [req.session.userId]);
-  if (!result.rows[0]) return res.status(401).json({ error: 'User not found' });
-  req.user = result.rows[0];
-  next();
-}
 
 router.get('/', requireAuth, async (req, res) => {
   try {
     const { refresh } = req.query;
 
-    // return cache unless refresh=true
     if (!refresh) {
       const cached = await pool.query(
         'SELECT * FROM activities WHERE user_id = $1 ORDER BY start_date DESC LIMIT 30',
@@ -30,11 +20,9 @@ router.get('/', requireAuth, async (req, res) => {
       }
     }
 
-    // pull from Strava
     const raw = await fetchActivities(req.user.access_token);
     const runs = filterRuns(raw);
 
-    // cache each run
     for (const run of runs) {
       await pool.query(`
         INSERT INTO activities (user_id, strava_id, name, type, start_date, distance, moving_time,
