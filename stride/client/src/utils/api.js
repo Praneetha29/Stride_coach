@@ -1,6 +1,9 @@
 import axios from 'axios';
 
-const api = axios.create({ withCredentials: true });
+const api = axios.create({
+  baseURL: import.meta.env.VITE_API_URL || '/',
+  withCredentials: true,
+});
 
 export const getMe = () => api.get('/auth/me').then(r => r.data);
 export const logout = () => api.post('/auth/logout');
