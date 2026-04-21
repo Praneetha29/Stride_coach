@@ -1,13 +1,12 @@
 import express from 'express';
 import axios from 'axios';
+import jwt from 'jsonwebtoken';
 import { pool } from '../utils/db.js';
 
 const router = express.Router();
-
 const STRAVA_AUTH_URL = 'https://www.strava.com/oauth/authorize';
 const STRAVA_TOKEN_URL = 'https://www.strava.com/oauth/token';
 
-// Step 1: redirect to Strava
 router.get('/strava', (req, res) => {
   const params = new URLSearchParams({
     client_id: process.env.STRAVA_CLIENT_ID,
@@ -19,10 +18,8 @@ router.get('/strava', (req, res) => {
   res.redirect(`${STRAVA_AUTH_URL}?${params}`);
 });
 
-// Step 2: Strava redirects back with a code
 router.get('/strava/callback', async (req, res) => {
   const { code, error } = req.query;
-
   if (error || !code) {
     return res.redirect(`${process.env.CLIENT_URL}?error=strava_auth_denied`);
   }
@@ -54,36 +51,43 @@ router.get('/strava/callback', async (req, res) => {
       expires_at,
     ]);
 
-    req.session.userId = result.rows[0].id;
+    // Generate JWT instead of session cookie
+    const jwtToken = jwt.sign(
+      { userId: result.rows[0].id },
+      process.env.SESSION_SECRET,
+      { expiresIn: '30d' }
+    );
 
-    // Save session explicitly before redirecting
-    req.session.save((err) => {
-      if (err) {
-        console.error('Session save error:', err);
-        return res.redirect(`${process.env.CLIENT_URL}?error=session_failed`);
-      }
-      res.redirect(`${process.env.CLIENT_URL}?auth=success&uid=${result.rows[0].id}`);
-    });
-
+    // Pass token to frontend via URL
+    res.redirect(`${process.env.CLIENT_URL}?auth=success&token=${jwtToken}`);
   } catch (err) {
     console.error('Strava OAuth error:', err.response?.data || err.message);
     res.redirect(`${process.env.CLIENT_URL}?error=auth_failed`);
   }
 });
 
-// Check who's logged in
 router.get('/me', async (req, res) => {
-  if (!req.session.userId) {
+  const authHeader = req.headers.authorization;
+  if (!authHeader?.startsWith('Bearer ')) {
     return res.status(401).json({ error: 'Not authenticated' });
   }
-  const result = await pool.query('SELECT id, name, profile_pic FROM users WHERE id = $1', [req.session.userId]);
-  if (!result.rows[0]) return res.status(401).json({ error: 'User not found' });
-  res.json(result.rows[0]);
+  try {
+    const token = authHeader.split(' ')[1];
+    const decoded = jwt.verify(token, process.env.SESSION_SECRET);
+    const result = await pool.query(
+      'SELECT id, name, profile_pic FROM users WHERE id = $1',
+      [decoded.userId]
+    );
+    if (!result.rows[0]) return res.status(401).json({ error: 'User not found' });
+    res.json(result.rows[0]);
+  } catch (err) {
+    res.status(401).json({ error: 'Invalid token' });
+  }
 });
 
-// Logout
 router.post('/logout', (req, res) => {
-  req.session.destroy(() => res.json({ success: true }));
+  
+  res.json({ success: true });
 });
 
 export default router;

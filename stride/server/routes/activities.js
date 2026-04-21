@@ -2,6 +2,7 @@ import express from 'express';
 import { fetchActivities, fetchActivity, filterRuns, speedToPace, metresToKm, formatDuration } from '../services/stravaService.js';
 import { pool } from '../utils/db.js';
 import { classifyRun } from '../services/dataProcessor.js'; 
+import { requireAuth } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 

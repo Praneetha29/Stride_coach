@@ -1,6 +1,7 @@
 import express from 'express';
 import { pool } from '../utils/db.js';
 import { chatWithCoach, generateRunOneliner } from '../services/claudeService.js';
+import { requireAuth } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 

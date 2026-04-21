@@ -1,14 +1,21 @@
 import axios from 'axios';
 
-const BASE_URL = import.meta.env.VITE_API_URL || 'https://stridecoach-production.up.railway.app';
+const BASE_URL = 'https://stridecoach-production.up.railway.app';
 
-const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'https://stridecoach-production.up.railway.app',
-  withCredentials: true,
+const api = axios.create({ baseURL: BASE_URL });
+
+// Attach JWT token to every request
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('stride_token');
+  if (token) config.headers.Authorization = `Bearer ${token}`;
+  return config;
 });
 
 export const getMe = () => api.get('/auth/me').then(r => r.data);
-export const logout = () => api.post('/auth/logout');
+export const logout = () => {
+  localStorage.removeItem('stride_token');
+  return Promise.resolve();
+};
 
 export const getActivities = (refresh = false) =>
   api.get('/activities', { params: { refresh } }).then(r => r.data);

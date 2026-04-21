@@ -1,5 +1,5 @@
 import { useState, useEffect, createContext, useContext } from 'react';
-import { getMe, logout as apiLogout } from '../utils/api.js';
+import { getMe } from '../utils/api.js';
 
 const AuthContext = createContext(null);
 
@@ -11,28 +11,27 @@ export function AuthProvider({ children }) {
   );
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get('token');
+    if (token) {
+      localStorage.setItem('stride_token', token);
+      window.history.replaceState({}, '', '/');
+    }
+
+    const stored = localStorage.getItem('stride_token');
+    if (!stored) {
+      setLoading(false);
+      return;
+    }
+
     getMe()
       .then(setUser)
-      .catch(() => setUser(null))
+      .catch(() => {
+        localStorage.removeItem('stride_token');
+        setUser(null);
+      })
       .finally(() => setLoading(false));
   }, []);
-
-  useEffect(() => {
-  const params = new URLSearchParams(window.location.search);
-  if (params.get('auth') === 'success') {
-    window.history.replaceState({}, '', '/');
-    let attempts = 0;
-    const tryGetMe = () => {
-      attempts++;
-      getMe()
-        .then(setUser)
-        .catch(() => {
-          if (attempts < 5) setTimeout(tryGetMe, 800);
-        });
-    };
-    setTimeout(tryGetMe, 300);
-  }
-}, []);
 
   function toggleCoach() {
     const next = coachMode === 'fire' ? 'cheer' : 'fire';
@@ -40,8 +39,8 @@ export function AuthProvider({ children }) {
     localStorage.setItem('stride_coach_mode', next);
   }
 
-  async function logout() {
-    await apiLogout();
+  function logout() {
+    localStorage.removeItem('stride_token');
     setUser(null);
   }
 
