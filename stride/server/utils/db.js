@@ -59,6 +59,40 @@ export async function initDb() {
       created_at TIMESTAMPTZ DEFAULT NOW(),
       UNIQUE(user_id, week_start)
     );
+
+    CREATE TABLE IF NOT EXISTS training_goals (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+      race_name TEXT NOT NULL,
+      race_distance TEXT NOT NULL,
+      goal_time TEXT,
+      race_date DATE NOT NULL,
+      status TEXT DEFAULT 'active',
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS training_weeks (
+      id SERIAL PRIMARY KEY,
+      goal_id INTEGER REFERENCES training_goals(id) ON DELETE CASCADE,
+      user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+      week_number INTEGER NOT NULL,
+      week_start DATE NOT NULL,
+      planned_runs JSONB,
+      actual_summary JSONB,
+      status TEXT DEFAULT 'upcoming',
+      adjustment_note TEXT,
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      UNIQUE(goal_id, week_number)
+    );
+
+    CREATE TABLE IF NOT EXISTS notifications (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+      type TEXT NOT NULL,
+      message TEXT NOT NULL,
+      read BOOLEAN DEFAULT FALSE,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    );
   `);
   console.log('Database tables ready');
 }

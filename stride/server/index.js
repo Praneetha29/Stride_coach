@@ -9,6 +9,8 @@ import activitiesRoutes from './routes/activities.js';
 import coachRoutes from './routes/coach.js';
 import reportsRoutes from './routes/reports.js';
 import { startReportScheduler } from './services/reportScheduler.js';
+import goalsRoutes from './routes/goals.js';
+import notificationsRoutes from './routes/notifications.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -41,6 +43,8 @@ app.use('/auth', authRoutes);
 app.use('/activities', activitiesRoutes);
 app.use('/coach', coachRoutes);
 app.use('/reports', reportsRoutes);
+app.use('/goals', goalsRoutes);
+app.use('/notifications', notificationsRoutes);
 
 initDb()
   .then(() => {
