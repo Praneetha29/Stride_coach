@@ -4,6 +4,7 @@ import { getActivity } from '../utils/api.js';
 import { useAuth } from '../hooks/useAuth.jsx';
 import HrPill from '../components/runs/HrPill.jsx';
 import CoachChat from '../components/coach/CoachChat.jsx';
+import RouteMap from '../components/runs/RouteMap.jsx';
 
 export default function RunDetail() {
   const { id } = useParams();
@@ -61,11 +62,7 @@ export default function RunDetail() {
           </div>
         ))}
       </div>
-      <div style={styles.mapBox}>
-        <span style={{ fontSize: 12, color: 'var(--color-text-tertiary)' }}>
-          {run.mapPolyline ? 'route map' : 'no route data'}
-        </span>
-      </div>
+      <RouteMap polyline={run.mapPolyline} />
       {run.coachOneliner && (
         <p style={{ fontSize: 12, color: 'var(--color-text-secondary)', borderLeft: `2px solid ${accent}`, borderRadius: 0, paddingLeft: 8, marginBottom: 16, lineHeight: 1.5 }}>
           {run.coachOneliner}

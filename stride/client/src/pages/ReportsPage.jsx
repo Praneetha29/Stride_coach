@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getReports, generateReport } from '../utils/api.js';
 import { useAuth } from '../hooks/useAuth.jsx';
+import PaceTrendChart from '../components/reports/PaceTrendChart.jsx';
 
 const STATUS = {
   green: { bg: 'var(--color-green-soft)', text: 'var(--color-green-text)', label: 'green — solid week' },
@@ -113,6 +114,7 @@ export default function ReportsPage() {
           <button style={{ ...styles.genBtn, color: accent, borderColor: accent, marginTop: 8 }} onClick={generate} disabled={generating}>
             {generating ? 'generating...' : 'regenerate report'}
           </button>
+          <PaceTrendChart />
         </>
       )}
     </div>
