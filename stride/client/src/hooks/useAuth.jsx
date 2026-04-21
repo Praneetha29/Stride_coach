@@ -18,15 +18,14 @@ export function AuthProvider({ children }) {
   }, []);
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    if (params.get('auth') === 'success') {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('auth') === 'success') {
+    window.history.replaceState({}, '', '/');
+    setTimeout(() => {
       getMe().then(setUser).catch(() => {});
-      window.history.replaceState({}, '', '/');
-    }
-    if (params.get('error')) {
-      window.history.replaceState({}, '', '/');
-    }
-  }, []);
+    }, 500);
+  }
+}, []);
 
   function toggleCoach() {
     const next = coachMode === 'fire' ? 'cheer' : 'fire';
