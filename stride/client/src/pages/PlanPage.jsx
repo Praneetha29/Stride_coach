@@ -86,6 +86,8 @@ export default function PlanPage() {
     ? JSON.parse(week.planned_runs)
     : (week.planned_runs || []);
 
+    if (week.week_number === 1) console.log('week 1 days:', days);
+
   const isCurrentWeek = week.status === 'current';
   const isCompleted = week.status === 'completed';
 
