@@ -4,6 +4,7 @@ import { getGoalPlan } from '../utils/api.js';
 import { useAuth } from '../hooks/useAuth.jsx';
 
 const DAY_LABELS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+const DAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
 
 const TYPE_STYLES = {
   easy:      { bg: '#EAF3DE', text: '#3B6D11', label: 'easy' },
