@@ -68,49 +68,71 @@ Answer only about this run and training. 2-3 sentences max.`;
 }
 
 export async function generateTrainingPlan(goal, currentWeeklyKm, weeksUntilRace, coachMode = 'fire') {
-  const prompt = `Generate a ${weeksUntilRace}-week training plan for this athlete:
+  const cappedWeeks = Math.min(12, weeksUntilRace);
+  const allWeeks = [];
+  const batchSize = 4;
+
+  for (let start = 1; start <= cappedWeeks; start += batchSize) {
+    const end = Math.min(start + batchSize - 1, cappedWeeks);
+    const batchCount = end - start + 1;
+
+    const weekStart = new Date();
+    weekStart.setDate(weekStart.getDate() + (start - 1) * 7);
+    const weekStartStr = weekStart.toISOString().split('T')[0];
+
+    const prompt = `Generate weeks ${start} to ${end} of a ${cappedWeeks}-week training plan.
 
 Goal: ${goal.race_distance} — ${goal.race_name}
 Target time: ${goal.goal_time || 'just finish'}
-Race date: ${goal.race_date}
 Current weekly mileage: ${currentWeeklyKm}km/week
-Weeks until race: ${weeksUntilRace}
+These are weeks ${start}-${end} of ${cappedWeeks} total weeks.
+First week in this batch starts: ${weekStartStr}
 
-Generate a JSON array of ${weeksUntilRace} weeks. Each week has 7 days (Monday to Sunday).
-For each day include:
+Generate exactly ${batchCount} weeks as a JSON array.
+Each week has 7 days (monday to sunday).
+For each day:
 - type: "easy" | "tempo" | "intervals" | "long" | "rest" | "race"
-- distance: number in km (0 for rest)
-- detail: full workout instruction (2-3 sentences with HR targets, pace targets, specific instructions)
+- distance: km as number (0 for rest)
+- detail: one sentence with key target (HR or pace)
 
-Follow these principles:
-- Build volume progressively with a cutback week every 4th week
-- 80% easy running, 20% quality
-- Long run on Sunday
-- Rest days on Tuesday and Friday typically
-- Taper last 2 weeks before race
+Principles:
+- 80% easy, 20% quality
+- Long run sunday, rest tuesday and friday
+- Progressive overload, cutback every 4th week
+- Taper final 2 weeks
 
-Respond ONLY with a valid JSON array, no markdown, no explanation:
+IMPORTANT: Start response with [ and end with ]. Raw JSON only, no markdown.
+
 [
   {
-    "week_number": 1,
+    "week_number": ${start},
     "week_start": "YYYY-MM-DD",
     "total_km": 30,
     "days": [
-      { "day": "monday", "type": "easy", "distance": 6, "detail": "Easy 6km run keeping HR below 145bpm. This should feel conversational — if you can't speak in full sentences you're going too hard. Focus on relaxed form and even breathing." },
-      { "day": "tuesday", "type": "rest", "distance": 0, "detail": "Full rest day. Light stretching or walking only." }
+      { "day": "monday", "type": "easy", "distance": 6, "detail": "Easy 6km keeping HR below 145bpm." },
+      { "day": "tuesday", "type": "rest", "distance": 0, "detail": "Full rest day." },
+      { "day": "wednesday", "type": "easy", "distance": 6, "detail": "Easy 6km at conversational pace." },
+      { "day": "thursday", "type": "easy", "distance": 5, "detail": "Easy 5km focusing on cadence." },
+      { "day": "friday", "type": "rest", "distance": 0, "detail": "Full rest day." },
+      { "day": "saturday", "type": "tempo", "distance": 6, "detail": "Tempo 6km at threshold pace." },
+      { "day": "sunday", "type": "long", "distance": 14, "detail": "Long run at easy effort." }
     ]
   }
 ]`;
 
-  const msg = await client.messages.create({
-    model: 'claude-haiku-4-5-20251001',
-    max_tokens: 4000,
-    system: PERSONAS[coachMode],
-    messages: [{ role: 'user', content: prompt }],
-  });
+    const msg = await client.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 3000,
+      system: PERSONAS[coachMode],
+      messages: [{ role: 'user', content: prompt }],
+    });
 
-  const text = msg.content[0].text.trim();
-  return parseJSON(text);
+    const text = msg.content[0].text.trim();
+    const batch = parseJSON(text);
+    allWeeks.push(...batch);
+  }
+
+  return allWeeks;
 }
 
 export async function adaptTrainingWeek(plannedWeek, actualRuns, nextWeek, coachMode = 'fire') {
@@ -126,14 +148,22 @@ Next week was planned as:
 ${JSON.stringify(nextWeek.planned_runs, null, 2)}
 
 Analyse the difference and adjust next week's plan if needed.
-Respond with JSON:
-{
-  "adjustment_needed": true/false,
-  "adjustment_note": "one sentence explaining what changed and why",
-  "updated_days": [ same format as planned_runs days array ]
-}
 
-Respond ONLY with valid JSON, no markdown.`;
+IMPORTANT: Start response with { and end with }. Raw JSON only, no markdown.
+
+{
+  "adjustment_needed": true,
+  "adjustment_note": "one sentence explaining what changed and why",
+  "updated_days": [
+    { "day": "monday", "type": "easy", "distance": 6, "detail": "Easy 6km keeping HR below 145bpm." },
+    { "day": "tuesday", "type": "rest", "distance": 0, "detail": "Full rest day." },
+    { "day": "wednesday", "type": "easy", "distance": 6, "detail": "Easy 6km at conversational pace." },
+    { "day": "thursday", "type": "easy", "distance": 5, "detail": "Easy 5km focusing on cadence." },
+    { "day": "friday", "type": "rest", "distance": 0, "detail": "Full rest day." },
+    { "day": "saturday", "type": "tempo", "distance": 6, "detail": "Tempo 6km at threshold pace." },
+    { "day": "sunday", "type": "long", "distance": 14, "detail": "Long run at easy effort." }
+  ]
+}`;
 
   const msg = await client.messages.create({
     model: 'claude-haiku-4-5-20251001',

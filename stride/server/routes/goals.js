@@ -41,7 +41,7 @@ router.post('/', requireAuth, async (req, res) => {
     // Weeks until race
     const today = new Date();
     const race = new Date(raceDate);
-    const weeksUntilRace = Math.max(4, Math.round((race - today) / (7 * 24 * 60 * 60 * 1000)));
+    const weeksUntilRace = Math.min(12, Math.max(4, Math.round((race - today) / (7 * 24 * 60 * 60 * 1000))));
 
     // Save goal
     const goalResult = await pool.query(`
