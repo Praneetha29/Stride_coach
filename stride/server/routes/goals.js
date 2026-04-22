@@ -52,13 +52,19 @@ router.post('/', requireAuth, async (req, res) => {
 
     const goal = goalResult.rows[0];
 
-    // Generate plan via Claude
-    const plan = await generateTrainingPlan(
-      goal,
-      currentWeeklyKm,
-      weeksUntilRace,
-      req.user.coach_mode || 'fire'
-    );
+    let plan;
+    try {
+        plan = await generateTrainingPlan(
+        goal,
+        currentWeeklyKm,
+        weeksUntilRace,
+        req.user.coach_mode || 'fire'
+        );
+        } catch (err) {
+        console.error('Plan generation error:', err.message);
+        await pool.query('DELETE FROM training_goals WHERE id = $1', [goal.id]);
+        return res.status(500).json({ error: 'Failed to generate plan — try again' });
+    }
 
     // Save each week
     for (const week of plan) {

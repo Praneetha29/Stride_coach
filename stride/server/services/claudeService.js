@@ -13,6 +13,15 @@ You acknowledge concerns but always frame them positively. Use exclamation point
 Keep responses concise — 2-3 sentences max.`,
 };
 
+function parseJSON(text) {
+  const cleaned = text
+    .replace(/^```json\s*/i, '')
+    .replace(/^```\s*/i, '')
+    .replace(/```\s*$/i, '')
+    .trim();
+  return JSON.parse(cleaned);
+}
+
 export async function generateRunOneliner(run, coachMode = 'fire') {
   const prompt = `Generate one punchy sentence (max 20 words) about this run:
 - Distance: ${metresToKm(run.distance)}km
@@ -88,11 +97,9 @@ Respond ONLY with a valid JSON array, no markdown, no explanation:
     "total_km": 30,
     "days": [
       { "day": "monday", "type": "easy", "distance": 6, "detail": "Easy 6km run keeping HR below 145bpm. This should feel conversational — if you can't speak in full sentences you're going too hard. Focus on relaxed form and even breathing." },
-      { "day": "tuesday", "type": "rest", "distance": 0, "detail": "Full rest day. Light stretching or walking only." },
-      ...
+      { "day": "tuesday", "type": "rest", "distance": 0, "detail": "Full rest day. Light stretching or walking only." }
     ]
-  },
-  ...
+  }
 ]`;
 
   const msg = await client.messages.create({
@@ -103,7 +110,7 @@ Respond ONLY with a valid JSON array, no markdown, no explanation:
   });
 
   const text = msg.content[0].text.trim();
-  return JSON.parse(text);
+  return parseJSON(text);
 }
 
 export async function adaptTrainingWeek(plannedWeek, actualRuns, nextWeek, coachMode = 'fire') {
@@ -136,7 +143,7 @@ Respond ONLY with valid JSON, no markdown.`;
   });
 
   const text = msg.content[0].text.trim();
-  return JSON.parse(text);
+  return parseJSON(text);
 }
 
 export async function generateWeeklyReport(summary, runs, coachMode = 'fire') {
