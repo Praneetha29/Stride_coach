@@ -52,35 +52,43 @@ router.post('/', requireAuth, async (req, res) => {
 
     const goal = goalResult.rows[0];
 
-    let plan;
-    try {
-        plan = await generateTrainingPlan(
-        goal,
-        currentWeeklyKm,
-        weeksUntilRace,
-        req.user.coach_mode || 'fire'
-        );
-        } catch (err) {
-        console.error('Plan generation error:', err.message);
-        await pool.query('DELETE FROM training_goals WHERE id = $1', [goal.id]);
-        return res.status(500).json({ error: 'Failed to generate plan — try again' });
-    }
+    // Generate plan via Claude
+let plan;
+try {
+  plan = await generateTrainingPlan(
+    goal,
+    currentWeeklyKm,
+    weeksUntilRace,
+    req.user.coach_mode || 'fire'
+  );
+  console.log('Plan generated, weeks:', plan.length);
+  console.log('First week sample:', JSON.stringify(plan[0], null, 2));
+} catch (err) {
+  console.error('Plan generation error:', err.message);
+  await pool.query('DELETE FROM training_goals WHERE id = $1', [goal.id]);
+  return res.status(500).json({ error: 'Failed to generate plan — try again' });
+}
 
-    // Save each week
-    for (const week of plan) {
-      await pool.query(`
-        INSERT INTO training_weeks (goal_id, user_id, week_number, week_start, planned_runs, status)
-        VALUES ($1, $2, $3, $4, $5, $6)
-        ON CONFLICT (goal_id, week_number) DO NOTHING
-      `, [
-        goal.id,
-        req.user.id,
-        week.week_number,
-        week.week_start,
-        JSON.stringify(week.days),
-        week.week_number === 1 ? 'current' : 'upcoming',
-      ]);
-    }
+// Save each week
+for (const week of plan) {
+  try {
+    await pool.query(`
+      INSERT INTO training_weeks (goal_id, user_id, week_number, week_start, planned_runs, status)
+      VALUES ($1, $2, $3, $4, $5, $6)
+      ON CONFLICT (goal_id, week_number) DO NOTHING
+    `, [
+      goal.id,
+      req.user.id,
+      week.week_number,
+      week.week_start,
+      JSON.stringify(week.days),
+      week.week_number === 1 ? 'current' : 'upcoming',
+    ]);
+    console.log(`Saved week ${week.week_number}`);
+  } catch (err) {
+    console.error(`Failed to save week ${week.week_number}:`, err.message);
+  }
+}
 
     // Return goal + weeks
     const weeksResult = await pool.query(
