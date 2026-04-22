@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { getGoalPlan } from '../utils/api.js';
 import { useAuth } from '../hooks/useAuth.jsx';
 
-const DAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+const DAY_LABELS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
 
 const TYPE_STYLES = {
   easy:      { bg: '#EAF3DE', text: '#3B6D11', label: 'easy' },
@@ -76,17 +76,15 @@ export default function PlanPage() {
         {/* Day headers */}
         <div style={styles.calHeader}>
           <div style={styles.weekCol} />
-          {DAYS.map(d => (
-            <div key={d} style={styles.dayHeader}>{d}</div>
-          ))}
+          {DAY_LABELS.map(d => (
+  <div key={d} style={styles.dayHeader}>{d}</div>
+))}
         </div>
 
         {weeks.map(week => {
   const days = typeof week.planned_runs === 'string'
     ? JSON.parse(week.planned_runs)
     : (week.planned_runs || []);
-
-    if (week.week_number === 1) console.log('week 1 days:', days);
 
   const isCurrentWeek = week.status === 'current';
   const isCompleted = week.status === 'completed';
