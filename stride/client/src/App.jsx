@@ -5,6 +5,9 @@ import Splash from './pages/Splash.jsx';
 import RunsPage from './pages/RunsPage.jsx';
 import RunDetail from './pages/RunDetail.jsx';
 import ReportsPage from './pages/ReportsPage.jsx';
+import GoalsPage from './pages/GoalsPage.jsx';
+import NewGoalPage from './pages/NewGoalPage.jsx';
+import PlanPage from './pages/PlanPage.jsx';
 
 function AppShell() {
   const { user, loading } = useAuth();
@@ -25,6 +28,9 @@ function AppShell() {
         <Route path="/run/:id" element={<RunDetail />} />
         <Route path="/reports" element={<ReportsPage />} />
         <Route path="*"        element={<Navigate to="/" replace />} />
+        <Route path="/goals"      element={<GoalsPage />} />
+        <Route path="/goals/new"  element={<NewGoalPage />} />
+        <Route path="/plan/:id"   element={<PlanPage />} />
       </Routes>
     </div>
   );
