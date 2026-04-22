@@ -81,65 +81,64 @@ export default function PlanPage() {
           ))}
         </div>
 
-        {/* Weeks */}
         {weeks.map(week => {
-          const days = week.planned_runs || [];
-          const isCurrentWeek = week.status === 'current';
-          const isCompleted = week.status === 'completed';
+  const days = typeof week.planned_runs === 'string'
+    ? JSON.parse(week.planned_runs)
+    : (week.planned_runs || []);
+
+  const isCurrentWeek = week.status === 'current';
+  const isCompleted = week.status === 'completed';
+
+  return (
+    <div key={week.id}>
+      <div style={{
+        ...styles.calRow,
+        background: isCurrentWeek ? 'var(--color-surface)' : 'transparent',
+        border: isCurrentWeek ? `0.5px solid ${accent}` : '0.5px solid transparent',
+        borderRadius: isCurrentWeek ? 'var(--radius-md)' : 0,
+      }}>
+        <div style={styles.weekCol}>
+          <div style={styles.weekNum}>w{week.week_number}</div>
+          {isCurrentWeek && <div style={{ ...styles.weekBadge, color: accent }}>now</div>}
+          {isCompleted && <div style={{ ...styles.weekBadge, color: 'var(--color-text-tertiary)' }}>done</div>}
+        </div>
+
+        {DAYS.map(dayName => {
+          const dayData = days.find(d => d.day === dayName);
+          const s = TYPE_STYLES[dayData?.type] || TYPE_STYLES.rest;
 
           return (
-            <div key={week.id}>
-              <div style={{
-                ...styles.calRow,
-                background: isCurrentWeek ? 'var(--color-surface)' : 'transparent',
-                border: isCurrentWeek ? `0.5px solid ${accent}` : '0.5px solid transparent',
-                borderRadius: isCurrentWeek ? 'var(--radius-md)' : 0,
-              }}>
-                {/* Week label */}
-                <div style={styles.weekCol}>
-                  <div style={styles.weekNum}>w{week.week_number}</div>
-                  {isCurrentWeek && <div style={{ ...styles.weekBadge, color: accent }}>now</div>}
-                  {isCompleted && <div style={{ ...styles.weekBadge, color: 'var(--color-text-tertiary)' }}>done</div>}
+            <div
+              key={dayName}
+              style={{
+                ...styles.dayCell,
+                background: s.bg,
+                opacity: isCompleted ? 0.5 : 1,
+                cursor: dayData?.detail ? 'pointer' : 'default',
+              }}
+              onClick={() => dayData?.detail && setSelectedDay(dayData)}
+            >
+              {dayData?.type !== 'rest' && dayData?.distance > 0 && (
+                <div style={{ ...styles.dayCellKm, color: s.text }}>
+                  {dayData.distance}k
                 </div>
-
-                {/* Day cells */}
-                {DAYS.map(dayName => {
-                  const dayData = days.find(d => d.day === dayName);
-                  const s = TYPE_STYLES[dayData?.type] || TYPE_STYLES.rest;
-
-                  return (
-                    <div
-                      key={dayName}
-                      style={{
-                        ...styles.dayCell,
-                        background: s.bg,
-                        opacity: isCompleted ? 0.5 : 1,
-                        cursor: dayData?.detail ? 'pointer' : 'default',
-                      }}
-                      onClick={() => dayData?.detail && setSelectedDay(dayData)}
-                    >
-                      {dayData?.type !== 'rest' && dayData?.distance > 0 && (
-                        <div style={{ ...styles.dayCellKm, color: s.text }}>
-                          {dayData.distance}k
-                        </div>
-                      )}
-                      {dayData?.type === 'rest' && (
-                        <div style={{ ...styles.dayCellKm, color: s.text, fontSize: 8 }}>—</div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* Adjustment note */}
-              {week.adjustment_note && (
-                <div style={styles.adjustNote}>
-                  plan adjusted: {week.adjustment_note}
-                </div>
+              )}
+              {(!dayData || dayData?.type === 'rest') && (
+                <div style={{ ...styles.dayCellKm, color: s.text, fontSize: 8 }}>—</div>
               )}
             </div>
           );
         })}
+      </div>
+
+      {week.adjustment_note && (
+        <div style={styles.adjustNote}>
+          plan adjusted: {week.adjustment_note}
+        </div>
+      )}
+    </div>
+  );
+})}
       </div>
 
       {/* Day detail drawer */}
