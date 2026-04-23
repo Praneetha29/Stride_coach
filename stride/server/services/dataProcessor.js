@@ -86,3 +86,24 @@ export function predictRaceTime(runs) {
   const s = Math.round(predicted10KSecs % 60).toString().padStart(2, '0');
   return h > 0 ? `${h}:${m.toString().padStart(2, '0')}:${s}` : `${m}:${s}`;
 }
+
+export function buildCompletedWeeksSummary(weeks, activitiesByWeek) {
+  return weeks
+    .filter(w => w.status === 'completed')
+    .map(w => {
+      const days = Array.isArray(w.planned_days)
+        ? w.planned_days
+        : typeof w.planned_days === 'string'
+          ? JSON.parse(w.planned_days || '[]')
+          : [];
+      const plannedKm = days.reduce((s, d) => s + (d.distance || 0), 0);
+      const actualKm = (activitiesByWeek[w.week_number] || [])
+        .reduce((s, r) => s + (r.distance || 0) / 1000, 0);
+      return {
+        week_number: w.week_number,
+        planned_km: Math.round(plannedKm * 10) / 10,
+        actual_km: Math.round(actualKm * 10) / 10,
+        compliance: plannedKm > 0 ? Math.round((actualKm / plannedKm) * 100) : 0,
+      };
+    });
+}

@@ -13,7 +13,7 @@ export default function Navbar() {
 
   const isRuns = pathname === '/' || pathname.startsWith('/run/');
   const isReports = pathname === '/reports';
-  const isGoals = pathname === '/goals' || pathname.startsWith('/plan/');
+  const isCalendar = pathname === '/calendar';
   const fire = coachMode === 'fire';
   const accent = fire ? 'var(--color-accent)' : 'var(--color-cheer)';
 
@@ -41,13 +41,10 @@ export default function Navbar() {
           stride<span style={{ color: accent }}>.</span>
         </span>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          {/* Notification bell */}
           <div style={{ position: 'relative' }}>
             <button onClick={openNotifs} style={styles.bellBtn}>
               <BellIcon />
-              {unread > 0 && (
-                <span style={styles.badge}>{unread}</span>
-              )}
+              {unread > 0 && <span style={styles.badge}>{unread}</span>}
             </button>
             {showNotifs && (
               <div style={styles.notifDrawer}>
@@ -67,8 +64,6 @@ export default function Navbar() {
               </div>
             )}
           </div>
-
-          {/* Coach toggle */}
           <button onClick={toggleCoach} style={styles.toggleWrap}>
             <span style={styles.toggleLabel}>coach</span>
             <div style={styles.pill}>
@@ -86,7 +81,6 @@ export default function Navbar() {
           </button>
         </div>
       </div>
-
       <div style={styles.tabs}>
         <button
           style={{ ...styles.tab, ...(isRuns ? { color: accent, borderBottom: `2px solid ${accent}`, fontWeight: 500 } : {}) }}
@@ -97,9 +91,9 @@ export default function Navbar() {
           onClick={() => navigate('/reports')}
         >report</button>
         <button
-          style={{ ...styles.tab, ...(isGoals ? { color: accent, borderBottom: `2px solid ${accent}`, fontWeight: 500 } : {}) }}
-          onClick={() => navigate('/goals')}
-        >goals</button>
+          style={{ ...styles.tab, ...(isCalendar ? { color: accent, borderBottom: `2px solid ${accent}`, fontWeight: 500 } : {}) }}
+          onClick={() => navigate('/calendar')}
+        >calendar</button>
       </div>
     </nav>
   );
@@ -120,7 +114,7 @@ const styles = {
   logo: { fontSize: 17, fontWeight: 500, letterSpacing: '-0.5px' },
   bellBtn: { position: 'relative', background: 'none', border: 'none', padding: 6, cursor: 'pointer', color: 'var(--color-text-secondary)', display: 'flex', alignItems: 'center' },
   badge: { position: 'absolute', top: 0, right: 0, width: 14, height: 14, borderRadius: '50%', background: '#E24B4A', color: '#fff', fontSize: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 500 },
-  notifDrawer: { position: 'absolute', top: 36, right: 0, width: 280, background: 'var(--color-surface)', border: '0.5px solid var(--color-border)', borderRadius: 'var(--radius-lg)', boxShadow: '0 4px 24px rgba(0,0,0,0.08)', zIndex: 100, overflow: 'hidden' },
+  notifDrawer: { position: 'absolute', top: 36, right: 0, width: 280, background: 'var(--color-surface)', border: '0.5px solid var(--color-border)', borderRadius: 'var(--radius-lg)', zIndex: 100, overflow: 'hidden' },
   notifHeader: { fontSize: 12, fontWeight: 500, color: 'var(--color-text-tertiary)', padding: '10px 14px', borderBottom: '0.5px solid var(--color-border)', textTransform: 'uppercase', letterSpacing: '0.4px' },
   notifEmpty: { fontSize: 13, color: 'var(--color-text-tertiary)', padding: '16px 14px', textAlign: 'center' },
   notifItem: { padding: '10px 14px', borderBottom: '0.5px solid var(--color-border)' },

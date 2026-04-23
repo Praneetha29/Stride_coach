@@ -10,7 +10,6 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// On 401 - be at the spash screen
 api.interceptors.response.use(
   (response) => response,
   (error) => {
@@ -43,11 +42,14 @@ export const generateReport = (coachMode) =>
   api.post('/reports/generate', { coachMode }).then(r => r.data);
 export const getPredictor = () => api.get('/reports/predictor').then(r => r.data);
 
-export const getGoals = () => api.get('/goals').then(r => r.data);
-export const createGoal = (data) => api.post('/goals', data).then(r => r.data);
-export const getGoalPlan = (id) => api.get(`/goals/${id}/plan`).then(r => r.data);
-export const updateGoalStatus = (id, status) => api.patch(`/goals/${id}`, { status }).then(r => r.data);
+// Calendar
+export const getCalendar = () => api.get('/calendar').then(r => r.data);
+export const addRacePin = (data) => api.post('/calendar/pins', data).then(r => r.data);
+export const removeRacePin = (id) => api.delete(`/calendar/pins/${id}`).then(r => r.data);
+export const resyncCalendar = (coachMode) =>
+  api.post('/calendar/resync', { coachMode }).then(r => r.data);
 
+// Notifications
 export const getNotifications = () => api.get('/notifications').then(r => r.data);
 export const getUnreadCount = () => api.get('/notifications/unread-count').then(r => r.data);
 export const markAllRead = () => api.patch('/notifications/read-all').then(r => r.data);
