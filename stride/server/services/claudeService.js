@@ -67,115 +67,6 @@ Answer only about this run and training. 2-3 sentences max.`;
   return response.content[0].text.trim();
 }
 
-export async function generateTrainingPlan(goal, currentWeeklyKm, weeksUntilRace, coachMode = 'fire') {
-  const cappedWeeks = Math.min(12, weeksUntilRace);
-  const allWeeks = [];
-  const batchSize = 4;
-
-  for (let start = 1; start <= cappedWeeks; start += batchSize) {
-    const end = Math.min(start + batchSize - 1, cappedWeeks);
-    const batchCount = end - start + 1;
-
-    const weekStart = new Date();
-    weekStart.setDate(weekStart.getDate() + (start - 1) * 7);
-    const weekStartStr = weekStart.toISOString().split('T')[0];
-
-    const prompt = `Generate weeks ${start} to ${end} of a ${cappedWeeks}-week training plan.
-
-Goal: ${goal.race_distance} — ${goal.race_name}
-Target time: ${goal.goal_time || 'just finish'}
-Current weekly mileage: ${currentWeeklyKm}km/week
-These are weeks ${start}-${end} of ${cappedWeeks} total weeks.
-First week in this batch starts: ${weekStartStr}
-
-Generate exactly ${batchCount} weeks as a JSON array.
-Each week has 7 days (monday to sunday).
-For each day:
-- type: "easy" | "tempo" | "intervals" | "long" | "rest" | "race"
-- distance: km as number (0 for rest)
-- detail: one sentence with key target (HR or pace)
-
-Principles:
-- 80% easy, 20% quality
-- Long run sunday, rest tuesday and friday
-- Progressive overload, cutback every 4th week
-- Taper final 2 weeks
-
-IMPORTANT: Start response with [ and end with ]. Raw JSON only, no markdown.
-
-[
-  {
-    "week_number": ${start},
-    "week_start": "YYYY-MM-DD",
-    "total_km": 30,
-    "days": [
-      { "day": "monday", "type": "easy", "distance": 6, "detail": "Easy 6km keeping HR below 145bpm." },
-      { "day": "tuesday", "type": "rest", "distance": 0, "detail": "Full rest day." },
-      { "day": "wednesday", "type": "easy", "distance": 6, "detail": "Easy 6km at conversational pace." },
-      { "day": "thursday", "type": "easy", "distance": 5, "detail": "Easy 5km focusing on cadence." },
-      { "day": "friday", "type": "rest", "distance": 0, "detail": "Full rest day." },
-      { "day": "saturday", "type": "tempo", "distance": 6, "detail": "Tempo 6km at threshold pace." },
-      { "day": "sunday", "type": "long", "distance": 14, "detail": "Long run at easy effort." }
-    ]
-  }
-]`;
-
-    const msg = await client.messages.create({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 3000,
-      system: PERSONAS[coachMode],
-      messages: [{ role: 'user', content: prompt }],
-    });
-
-    const text = msg.content[0].text.trim();
-    const batch = parseJSON(text);
-    allWeeks.push(...batch);
-  }
-
-  return allWeeks;
-}
-
-export async function adaptTrainingWeek(plannedWeek, actualRuns, nextWeek, coachMode = 'fire') {
-  const prompt = `A runner's training week didn't go exactly as planned. Adapt next week accordingly.
-
-Planned this week:
-${JSON.stringify(plannedWeek.planned_runs, null, 2)}
-
-What actually happened:
-${JSON.stringify(actualRuns, null, 2)}
-
-Next week was planned as:
-${JSON.stringify(nextWeek.planned_runs, null, 2)}
-
-Analyse the difference and adjust next week's plan if needed.
-
-IMPORTANT: Start response with { and end with }. Raw JSON only, no markdown.
-
-{
-  "adjustment_needed": true,
-  "adjustment_note": "one sentence explaining what changed and why",
-  "updated_days": [
-    { "day": "monday", "type": "easy", "distance": 6, "detail": "Easy 6km keeping HR below 145bpm." },
-    { "day": "tuesday", "type": "rest", "distance": 0, "detail": "Full rest day." },
-    { "day": "wednesday", "type": "easy", "distance": 6, "detail": "Easy 6km at conversational pace." },
-    { "day": "thursday", "type": "easy", "distance": 5, "detail": "Easy 5km focusing on cadence." },
-    { "day": "friday", "type": "rest", "distance": 0, "detail": "Full rest day." },
-    { "day": "saturday", "type": "tempo", "distance": 6, "detail": "Tempo 6km at threshold pace." },
-    { "day": "sunday", "type": "long", "distance": 14, "detail": "Long run at easy effort." }
-  ]
-}`;
-
-  const msg = await client.messages.create({
-    model: 'claude-haiku-4-5-20251001',
-    max_tokens: 2000,
-    system: PERSONAS[coachMode],
-    messages: [{ role: 'user', content: prompt }],
-  });
-
-  const text = msg.content[0].text.trim();
-  return parseJSON(text);
-}
-
 export async function generateWeeklyReport(summary, runs, coachMode = 'fire') {
   const runLines = runs.slice(0, 7).map(r =>
     `• ${new Date(r.start_date).toDateString()}: ${metresToKm(r.distance)}km at ${speedToPace(r.average_speed)}/km, avg HR ${r.average_heartrate ? Math.round(r.average_heartrate) + 'bpm' : 'no HR'}`
@@ -206,21 +97,28 @@ Write 3-4 sentences: what went well, any concerns, one concrete action for next 
 
 export async function generateCalendarBlock(fromDate, toDate, racePins, currentWeeklyKm, recentRuns, coachMode = 'fire') {
   const weeksToGenerate = Math.ceil((new Date(toDate) - new Date(fromDate)) / (7 * 24 * 60 * 60 * 1000));
-  
-  const pinsContext = racePins.map(pin => `
+  const cappedWeeks = Math.min(12, weeksToGenerate);
+
+  const pinsContext = racePins.map(pin => {
+    const gymDaysArr = Array.isArray(pin.gym_days)
+      ? pin.gym_days
+      : typeof pin.gym_days === 'string'
+        ? JSON.parse(pin.gym_days || '[]')
+        : [];
+    return `
 - ${pin.race_name} (${pin.race_distance}) on ${pin.race_date}
   Runs per week: ${pin.runs_per_week}
-  Gym days: ${JSON.parse(pin.gym_days || '[]').join(', ') || 'none'}
+  Gym days: ${gymDaysArr.join(', ') || 'none'}
   Notes: ${pin.notes || 'none'}
   Goal time: ${pin.goal_time || 'just finish'}
-  Weeks away: ${Math.ceil((new Date(pin.race_date) - new Date(fromDate)) / (7 * 24 * 60 * 60 * 1000))}
-`).join('\n');
+  Weeks away: ${Math.ceil((new Date(pin.race_date) - new Date(fromDate)) / (7 * 24 * 60 * 60 * 1000))}`;
+  }).join('\n');
 
   const recentContext = recentRuns.slice(0, 6).map(r =>
     `• ${metresToKm(r.distance)}km at ${speedToPace(r.average_speed)}/km, HR ${r.average_heartrate ? Math.round(r.average_heartrate) + 'bpm' : 'unknown'}`
   ).join('\n');
 
-  const prompt = `Generate a ${weeksToGenerate}-week training calendar block.
+  const prompt = `Generate a ${cappedWeeks}-week training calendar block.
 
 Athlete current fitness:
 - Weekly mileage: ${currentWeeklyKm}km
@@ -232,15 +130,15 @@ ${pinsContext}
 
 Rules:
 - Respect each race's runs_per_week preference
-- Put gym on specified gym days (type: "gym")
+- Put gym on specified gym days (type: "gym", distance: 0)
 - Taper 1 week before each race (reduce volume 30%, no hard sessions)
 - Add recovery week after each race (easy runs only, 40% volume)
 - Progressive overload — increase volume max 10% per week
-- Long run on sunday, rest on tuesday unless athlete prefers otherwise
+- Long run on sunday, rest on tuesday unless athlete specifies otherwise
 
-Generate exactly ${weeksToGenerate} weeks.
+Generate exactly ${cappedWeeks} weeks.
 
-IMPORTANT: Start with [ end with ]. Raw JSON only.
+IMPORTANT: Start response with [ and end with ]. Raw JSON only, no markdown.
 
 [
   {
@@ -269,21 +167,31 @@ IMPORTANT: Start with [ end with ]. Raw JSON only.
 }
 
 export async function resyncCalendar(fromDate, racePins, completedSummary, actualRuns, currentWeeklyKm, weeksToGen, coachMode = 'fire') {
-  const pinsContext = racePins.map(pin => `
+  const cappedWeeks = Math.min(12, weeksToGen);
+
+  const pinsContext = racePins.map(pin => {
+    const gymDaysArr = Array.isArray(pin.gym_days)
+      ? pin.gym_days
+      : typeof pin.gym_days === 'string'
+        ? JSON.parse(pin.gym_days || '[]')
+        : [];
+    return `
 - ${pin.race_name} (${pin.race_distance}) on ${pin.race_date}
   Runs per week: ${pin.runs_per_week}
-  Gym days: ${JSON.parse(pin.gym_days || '[]').join(', ') || 'none'}
+  Gym days: ${gymDaysArr.join(', ') || 'none'}
   Notes: ${pin.notes || 'none'}
-  Weeks away: ${Math.ceil((new Date(pin.race_date) - new Date(fromDate)) / (7 * 24 * 60 * 60 * 1000))}
-`).join('\n');
+  Weeks away: ${Math.ceil((new Date(pin.race_date) - new Date(fromDate)) / (7 * 24 * 60 * 60 * 1000))}`;
+  }).join('\n');
 
   const recentContext = actualRuns.slice(0, 8).map(r =>
     `• ${metresToKm(r.distance)}km at ${speedToPace(r.average_speed)}/km, HR ${r.average_heartrate ? Math.round(r.average_heartrate) + 'bpm' : 'unknown'}`
   ).join('\n');
 
-  const completedContext = completedSummary.map(w =>
-    `Week ${w.week_number}: planned ${w.planned_km}km, actual ${w.actual_km}km (${w.compliance}% compliance)`
-  ).join('\n');
+  const completedContext = completedSummary.length
+    ? completedSummary.map(w =>
+        `Week ${w.week_number}: planned ${w.planned_km}km, actual ${w.actual_km}km (${w.compliance}% compliance)`
+      ).join('\n')
+    : 'No completed weeks yet';
 
   const prompt = `Resync a running training calendar based on actual performance.
 
@@ -297,14 +205,28 @@ ${completedContext}
 Upcoming races:
 ${pinsContext}
 
-Assess performance and regenerate the next ${weeksToGen} weeks.
+Assess performance and regenerate the next ${cappedWeeks} weeks.
 
-IMPORTANT: Start with { end with }. Raw JSON only.
+IMPORTANT: Start response with { and end with }. Raw JSON only, no markdown.
 
 {
   "assessment": "2-3 sentence assessment of fitness vs plan",
-  "adjustment": "ahead" | "on_track" | "behind",
-  "weeks": [ ...same format as above... ]
+  "adjustment": "ahead",
+  "weeks": [
+    {
+      "week_number": 1,
+      "week_start": "YYYY-MM-DD",
+      "days": [
+        { "day": "monday", "type": "easy", "distance": 6, "detail": "Easy 6km HR below 145bpm." },
+        { "day": "tuesday", "type": "rest", "distance": 0, "detail": "Rest day." },
+        { "day": "wednesday", "type": "gym", "distance": 0, "detail": "Gym session." },
+        { "day": "thursday", "type": "easy", "distance": 5, "detail": "Easy 5km." },
+        { "day": "friday", "type": "rest", "distance": 0, "detail": "Rest day." },
+        { "day": "saturday", "type": "tempo", "distance": 6, "detail": "Tempo 6km." },
+        { "day": "sunday", "type": "long", "distance": 12, "detail": "Long run 12km easy effort." }
+      ]
+    }
+  ]
 }`;
 
   const msg = await client.messages.create({

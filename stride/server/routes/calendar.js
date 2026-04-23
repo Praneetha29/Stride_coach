@@ -6,7 +6,6 @@ import { speedToPace, metresToKm } from '../services/stravaService.js';
 import { buildCompletedWeeksSummary } from '../services/dataProcessor.js';
 
 const router = express.Router();
-
 const WEEKS_AHEAD = 6;
 
 async function getOrCreateCalendar(userId) {
@@ -33,11 +32,10 @@ async function getCurrentWeeklyKm(userId) {
   return Math.round((total / 1000) / 4);
 }
 
-// GET /calendar — get full calendar + pins
+// GET /calendar
 router.get('/', requireAuth, async (req, res) => {
   try {
     const calendar = await getOrCreateCalendar(req.user.id);
-
     const [weeksResult, pinsResult] = await Promise.all([
       pool.query(
         'SELECT * FROM calendar_weeks WHERE calendar_id = $1 ORDER BY week_number',
@@ -48,7 +46,6 @@ router.get('/', requireAuth, async (req, res) => {
         [calendar.id]
       ),
     ]);
-
     res.json({
       calendar,
       weeks: weeksResult.rows,
@@ -60,7 +57,7 @@ router.get('/', requireAuth, async (req, res) => {
   }
 });
 
-// POST /calendar/pins — add a race pin + extend plan
+// POST /calendar/pins
 router.post('/pins', requireAuth, async (req, res) => {
   const { raceName, raceDistance, raceDate, goalTime, runsPerWeek, gymDays, notes } = req.body;
 
@@ -71,6 +68,13 @@ router.post('/pins', requireAuth, async (req, res) => {
   try {
     const calendar = await getOrCreateCalendar(req.user.id);
 
+    // Parse gymDays safely
+    const parsedGymDays = Array.isArray(gymDays)
+      ? gymDays
+      : typeof gymDays === 'string' && gymDays
+        ? gymDays.split(',').map(d => d.trim())
+        : [];
+
     // Save the pin
     const pinResult = await pool.query(`
       INSERT INTO race_pins (calendar_id, user_id, race_name, race_distance, race_date, goal_time, runs_per_week, gym_days, notes)
@@ -79,7 +83,7 @@ router.post('/pins', requireAuth, async (req, res) => {
     `, [
       calendar.id, req.user.id, raceName, raceDistance, raceDate,
       goalTime || null, runsPerWeek || 4,
-      JSON.stringify(gymDays || []), notes || null,
+      JSON.stringify(parsedGymDays), notes || null,
     ]);
     const pin = pinResult.rows[0];
 
@@ -100,7 +104,7 @@ router.post('/pins', requireAuth, async (req, res) => {
 
     // Generate from current week to 6 weeks past the new pin
     const fromDate = new Date();
-    fromDate.setDate(fromDate.getDate() - fromDate.getDay() + 1); // this monday
+    fromDate.setDate(fromDate.getDate() - fromDate.getDay() + 1);
     const toDate = new Date(raceDate);
     toDate.setDate(toDate.getDate() + WEEKS_AHEAD * 7);
 
@@ -118,14 +122,12 @@ router.post('/pins', requireAuth, async (req, res) => {
       req.user.coach_mode || 'fire'
     );
 
-    // Figure out what week number to start from
     const startWeekNum = lastWeekNumber + 1;
 
-    // Save weeks — skip existing ones
+    // Save weeks
     for (let i = 0; i < blocks.length; i++) {
       const block = blocks[i];
       const weekNum = startWeekNum + i;
-
       await pool.query(`
         INSERT INTO calendar_weeks (calendar_id, user_id, week_number, week_start, planned_days, status)
         VALUES ($1, $2, $3, $4, $5, $6)
@@ -146,11 +148,12 @@ router.post('/pins', requireAuth, async (req, res) => {
     res.json({ pin, weeksAdded: blocks.length });
   } catch (err) {
     console.error('Add pin error:', err.message);
-    res.status(500).json({ error: 'Failed to add race — try again' });
+    console.error('Add pin stack:', err.stack);
+    res.status(500).json({ error: err.message });
   }
 });
 
-// DELETE /calendar/pins/:id — remove a pin
+// DELETE /calendar/pins/:id
 router.delete('/pins/:id', requireAuth, async (req, res) => {
   try {
     await pool.query(
@@ -163,7 +166,7 @@ router.delete('/pins/:id', requireAuth, async (req, res) => {
   }
 });
 
-// POST /calendar/resync — resync from current week forward
+// POST /calendar/resync
 router.post('/resync', requireAuth, async (req, res) => {
   const { coachMode = 'fire' } = req.body;
 
@@ -186,7 +189,6 @@ router.post('/resync', requireAuth, async (req, res) => {
     const completedWeeks = weeks.slice(0, currentWeekIdx);
     const remainingWeeks = weeks.slice(currentWeekIdx);
 
-    // Build activities by week for compliance
     const activitiesByWeek = {};
     for (const run of actualRuns) {
       const weekIdx = weeks.findIndex(w => {
@@ -212,12 +214,10 @@ router.post('/resync', requireAuth, async (req, res) => {
       currentWeeklyKm, remainingWeeks.length, coachMode
     );
 
-    // Update remaining weeks
     for (let i = 0; i < resync.weeks.length; i++) {
       const newWeek = resync.weeks[i];
       const dbWeek = remainingWeeks[i];
       if (!dbWeek) continue;
-
       await pool.query(
         'UPDATE calendar_weeks SET planned_days = $1, adjustment_note = $2 WHERE id = $3',
         [
@@ -240,7 +240,8 @@ router.post('/resync', requireAuth, async (req, res) => {
     });
   } catch (err) {
     console.error('Resync error:', err.message);
-    res.status(500).json({ error: 'Failed to resync — try again' });
+    console.error('Resync stack:', err.stack);
+    res.status(500).json({ error: err.message });
   }
 });
 
