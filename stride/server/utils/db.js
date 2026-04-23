@@ -10,6 +10,11 @@ const pool = new Pool({
 
 export async function initDb() {
   await pool.query(`
+    DROP TABLE IF EXISTS training_weeks CASCADE;
+    DROP TABLE IF EXISTS training_goals CASCADE;
+  `);
+
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS users (
       id SERIAL PRIMARY KEY,
       strava_id BIGINT UNIQUE NOT NULL,
@@ -60,29 +65,38 @@ export async function initDb() {
       UNIQUE(user_id, week_start)
     );
 
-    CREATE TABLE IF NOT EXISTS training_goals (
+    CREATE TABLE IF NOT EXISTS training_calendar (
       id SERIAL PRIMARY KEY,
-      user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
-      race_name TEXT NOT NULL,
-      race_distance TEXT NOT NULL,
-      goal_time TEXT,
-      race_date DATE NOT NULL,
-      status TEXT DEFAULT 'active',
+      user_id INTEGER REFERENCES users(id) ON DELETE CASCADE UNIQUE,
       created_at TIMESTAMPTZ DEFAULT NOW()
     );
 
-    CREATE TABLE IF NOT EXISTS training_weeks (
+    CREATE TABLE IF NOT EXISTS calendar_weeks (
       id SERIAL PRIMARY KEY,
-      goal_id INTEGER REFERENCES training_goals(id) ON DELETE CASCADE,
+      calendar_id INTEGER REFERENCES training_calendar(id) ON DELETE CASCADE,
       user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
       week_number INTEGER NOT NULL,
       week_start DATE NOT NULL,
-      planned_runs JSONB,
-      actual_summary JSONB,
+      planned_days JSONB,
       status TEXT DEFAULT 'upcoming',
       adjustment_note TEXT,
       created_at TIMESTAMPTZ DEFAULT NOW(),
-      UNIQUE(goal_id, week_number)
+      UNIQUE(calendar_id, week_number)
+    );
+
+    CREATE TABLE IF NOT EXISTS race_pins (
+      id SERIAL PRIMARY KEY,
+      calendar_id INTEGER REFERENCES training_calendar(id) ON DELETE CASCADE,
+      user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+      race_name TEXT NOT NULL,
+      race_distance TEXT NOT NULL,
+      race_date DATE NOT NULL,
+      goal_time TEXT,
+      runs_per_week INTEGER DEFAULT 4,
+      gym_days JSONB DEFAULT '[]',
+      notes TEXT,
+      status TEXT DEFAULT 'upcoming',
+      created_at TIMESTAMPTZ DEFAULT NOW()
     );
 
     CREATE TABLE IF NOT EXISTS notifications (
@@ -94,6 +108,7 @@ export async function initDb() {
       created_at TIMESTAMPTZ DEFAULT NOW()
     );
   `);
+
   console.log('Database tables ready');
 }
 

@@ -203,3 +203,116 @@ Write 3-4 sentences: what went well, any concerns, one concrete action for next 
 
   return msg.content[0].text.trim();
 }
+
+export async function generateCalendarBlock(fromDate, toDate, racePins, currentWeeklyKm, recentRuns, coachMode = 'fire') {
+  const weeksToGenerate = Math.ceil((new Date(toDate) - new Date(fromDate)) / (7 * 24 * 60 * 60 * 1000));
+  
+  const pinsContext = racePins.map(pin => `
+- ${pin.race_name} (${pin.race_distance}) on ${pin.race_date}
+  Runs per week: ${pin.runs_per_week}
+  Gym days: ${JSON.parse(pin.gym_days || '[]').join(', ') || 'none'}
+  Notes: ${pin.notes || 'none'}
+  Goal time: ${pin.goal_time || 'just finish'}
+  Weeks away: ${Math.ceil((new Date(pin.race_date) - new Date(fromDate)) / (7 * 24 * 60 * 60 * 1000))}
+`).join('\n');
+
+  const recentContext = recentRuns.slice(0, 6).map(r =>
+    `• ${metresToKm(r.distance)}km at ${speedToPace(r.average_speed)}/km, HR ${r.average_heartrate ? Math.round(r.average_heartrate) + 'bpm' : 'unknown'}`
+  ).join('\n');
+
+  const prompt = `Generate a ${weeksToGenerate}-week training calendar block.
+
+Athlete current fitness:
+- Weekly mileage: ${currentWeeklyKm}km
+- Recent runs:
+${recentContext}
+
+Upcoming races (plan around these):
+${pinsContext}
+
+Rules:
+- Respect each race's runs_per_week preference
+- Put gym on specified gym days (type: "gym")
+- Taper 1 week before each race (reduce volume 30%, no hard sessions)
+- Add recovery week after each race (easy runs only, 40% volume)
+- Progressive overload — increase volume max 10% per week
+- Long run on sunday, rest on tuesday unless athlete prefers otherwise
+
+Generate exactly ${weeksToGenerate} weeks.
+
+IMPORTANT: Start with [ end with ]. Raw JSON only.
+
+[
+  {
+    "week_number": 1,
+    "week_start": "YYYY-MM-DD",
+    "days": [
+      { "day": "monday", "type": "easy", "distance": 6, "detail": "Easy 6km HR below 145bpm." },
+      { "day": "tuesday", "type": "rest", "distance": 0, "detail": "Rest day." },
+      { "day": "wednesday", "type": "gym", "distance": 0, "detail": "Gym session." },
+      { "day": "thursday", "type": "easy", "distance": 5, "detail": "Easy 5km." },
+      { "day": "friday", "type": "rest", "distance": 0, "detail": "Rest day." },
+      { "day": "saturday", "type": "tempo", "distance": 6, "detail": "Tempo 6km." },
+      { "day": "sunday", "type": "long", "distance": 12, "detail": "Long run 12km easy effort." }
+    ]
+  }
+]`;
+
+  const msg = await client.messages.create({
+    model: 'claude-haiku-4-5-20251001',
+    max_tokens: 4000,
+    system: PERSONAS[coachMode],
+    messages: [{ role: 'user', content: prompt }],
+  });
+
+  return parseJSON(msg.content[0].text.trim());
+}
+
+export async function resyncCalendar(fromDate, racePins, completedSummary, actualRuns, currentWeeklyKm, weeksToGen, coachMode = 'fire') {
+  const pinsContext = racePins.map(pin => `
+- ${pin.race_name} (${pin.race_distance}) on ${pin.race_date}
+  Runs per week: ${pin.runs_per_week}
+  Gym days: ${JSON.parse(pin.gym_days || '[]').join(', ') || 'none'}
+  Notes: ${pin.notes || 'none'}
+  Weeks away: ${Math.ceil((new Date(pin.race_date) - new Date(fromDate)) / (7 * 24 * 60 * 60 * 1000))}
+`).join('\n');
+
+  const recentContext = actualRuns.slice(0, 8).map(r =>
+    `• ${metresToKm(r.distance)}km at ${speedToPace(r.average_speed)}/km, HR ${r.average_heartrate ? Math.round(r.average_heartrate) + 'bpm' : 'unknown'}`
+  ).join('\n');
+
+  const completedContext = completedSummary.map(w =>
+    `Week ${w.week_number}: planned ${w.planned_km}km, actual ${w.actual_km}km (${w.compliance}% compliance)`
+  ).join('\n');
+
+  const prompt = `Resync a running training calendar based on actual performance.
+
+Current weekly mileage: ${currentWeeklyKm}km
+Recent runs:
+${recentContext}
+
+Completed weeks:
+${completedContext}
+
+Upcoming races:
+${pinsContext}
+
+Assess performance and regenerate the next ${weeksToGen} weeks.
+
+IMPORTANT: Start with { end with }. Raw JSON only.
+
+{
+  "assessment": "2-3 sentence assessment of fitness vs plan",
+  "adjustment": "ahead" | "on_track" | "behind",
+  "weeks": [ ...same format as above... ]
+}`;
+
+  const msg = await client.messages.create({
+    model: 'claude-haiku-4-5-20251001',
+    max_tokens: 4000,
+    system: PERSONAS[coachMode],
+    messages: [{ role: 'user', content: prompt }],
+  });
+
+  return parseJSON(msg.content[0].text.trim());
+}
