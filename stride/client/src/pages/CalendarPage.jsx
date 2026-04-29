@@ -113,28 +113,38 @@ export default function CalendarPage() {
     }));
   }
 
-  // Insert race pins into the week list as markers
-  function buildCalendarRows() {
-    const rows = [];
-    const sortedPins = [...pins].sort((a, b) => new Date(a.race_date) - new Date(b.race_date));
+function buildCalendarRows() {
+  const rows = [];
+  const sortedPins = [...pins].sort((a, b) => new Date(a.race_date) - new Date(b.race_date));
+  const usedPins = new Set();
 
-    for (const week of weeks) {
-      const weekEnd = new Date(week.week_start);
-      weekEnd.setDate(weekEnd.getDate() + 7);
+  for (const week of weeks) {
+    const weekStart = new Date(week.week_start);
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekEnd.getDate() + 7);
 
-      // Insert any pins that fall in this week
-      for (const pin of sortedPins) {
-        const pinDate = new Date(pin.race_date);
-        if (pinDate >= new Date(week.week_start) && pinDate < weekEnd) {
-          rows.push({ type: 'pin', pin });
-        }
+    rows.push({ type: 'week', week });
+
+    // Insert pins that fall after this week ends
+    for (const pin of sortedPins) {
+      if (usedPins.has(pin.id)) continue;
+      const pinDate = new Date(pin.race_date);
+      if (pinDate >= weekStart && pinDate < weekEnd) {
+        usedPins.add(pin.id);
+        rows.push({ type: 'pin', pin });
       }
-
-      rows.push({ type: 'week', week });
     }
-
-    return rows;
   }
+
+  // Add any remaining pins after all weeks
+  for (const pin of sortedPins) {
+    if (!usedPins.has(pin.id)) {
+      rows.push({ type: 'pin', pin });
+    }
+  }
+
+  return rows;
+}
 
   if (loading) return <div style={styles.state}>loading your calendar...</div>;
 
@@ -161,6 +171,34 @@ export default function CalendarPage() {
           </button>
         </div>
       </div>
+
+      {/* Races list */}
+{pins.length > 0 && (
+  <div style={styles.racesList}>
+    {pins.map(pin => {
+      const dc = DISTANCE_COLORS[pin.race_distance] || DISTANCE_COLORS['Other'];
+      const daysLeft = Math.max(0, Math.round((new Date(pin.race_date) - new Date()) / (24 * 60 * 60 * 1000)));
+      const raceDate = new Date(pin.race_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+      return (
+        <div key={pin.id} style={styles.raceItem}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ ...styles.distPill, background: dc.bg, color: dc.text }}>
+              {pin.race_distance}
+            </span>
+            <div>
+              <div style={styles.raceName}>{pin.race_name}</div>
+              <div style={styles.raceMeta}>{raceDate}{pin.goal_time ? ` · ${pin.goal_time}` : ''}</div>
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={styles.daysLeft}>{daysLeft}d</span>
+            <button style={styles.removeBtn} onClick={() => handleRemovePin(pin.id)}>✕</button>
+          </div>
+        </div>
+      );
+    })}
+  </div>
+)}
 
       {/* Resync result */}
       {resyncResult && !resyncResult.error && (
@@ -221,27 +259,23 @@ export default function CalendarPage() {
 
           {rows.map((row, i) => {
             if (row.type === 'pin') {
-              const pin = row.pin;
-              const dc = DISTANCE_COLORS[pin.race_distance] || DISTANCE_COLORS['Other'];
-              const raceDate = new Date(pin.race_date).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' });
-              return (
-                <div key={`pin-${pin.id}`} style={styles.pinRow}>
-                  <div style={{ ...styles.pinBadge, background: dc.bg, color: dc.text }}>
-                    {pin.race_distance}
-                  </div>
-                  <div style={styles.pinLine} />
-                  <div style={styles.pinInfo}>
-                    <span style={{ ...styles.pinName, color: dc.text }}>{pin.race_name}</span>
-                    <span style={styles.pinDate}>{raceDate}</span>
-                  </div>
-                  <div style={styles.pinLine} />
-                  <button
-                    style={styles.pinRemove}
-                    onClick={() => handleRemovePin(pin.id)}
-                  >✕</button>
-                </div>
-              );
-            }
+  const pin = row.pin;
+  const dc = DISTANCE_COLORS[pin.race_distance] || DISTANCE_COLORS['Other'];
+  const raceDate = new Date(pin.race_date).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' });
+  return (
+    <div key={`pin-${pin.id}`} style={styles.pinRow}>
+      <div style={styles.pinLine} />
+      <div style={{ ...styles.pinBadge, background: dc.bg, color: dc.text }}>
+        {pin.race_distance}
+      </div>
+      <div style={styles.pinInfo}>
+        <span style={{ ...styles.pinName, color: dc.text }}>{pin.race_name}</span>
+        <span style={styles.pinDate}>{raceDate}</span>
+      </div>
+      <div style={styles.pinLine} />
+    </div>
+  );
+}
 
             const week = row.week;
             const days = Array.isArray(week.planned_days)
@@ -522,4 +556,11 @@ const styles = {
   field: { display: 'flex', flexDirection: 'column', gap: 8 },
   label: { fontSize: 12, fontWeight: 500, color: 'var(--color-text-primary)' },
   input: { fontSize: 13, padding: '10px 12px', borderRadius: 'var(--radius-md)', border: '0.5px solid var(--color-border)', background: 'var(--color-surface)', color: 'var(--color-text-primary)', outline: 'none', width: '100%' },
+  racesList: { display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 },
+  raceItem: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--color-surface)', border: '0.5px solid var(--color-border)', borderRadius: 'var(--radius-lg)', padding: '10px 14px' },
+  distPill: { fontSize: 10, padding: '2px 8px', borderRadius: 'var(--radius-pill)', fontWeight: 500, flexShrink: 0 },
+raceName: { fontSize: 13, fontWeight: 500, color: 'var(--color-text-primary)' },
+raceMeta: { fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 2 },
+daysLeft: { fontSize: 13, fontWeight: 500, color: 'var(--color-text-secondary)', background: 'var(--color-bg)', border: '0.5px solid var(--color-border)', borderRadius: 'var(--radius-pill)', padding: '3px 10px' },
+removeBtn: { background: 'none', border: 'none', fontSize: 12, color: 'var(--color-text-tertiary)', cursor: 'pointer', padding: '0 4px' },
 };
