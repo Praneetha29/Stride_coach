@@ -71,20 +71,47 @@ export function buildWeeklySummary(runs, prevWeekRuns = []) {
 }
 
 export function predictRaceTime(runs) {
-  const easyRuns = runs.filter(r =>
-    r.average_heartrate && r.average_heartrate < 150 &&
-    r.average_speed && r.distance > 3000
-  );
-  if (easyRuns.length < 2) return null;
+  if (!runs.length) return null;
 
-  const avgEasySpeed = easyRuns.reduce((s, r) => s + r.average_speed, 0) / easyRuns.length;
-  const thresholdSpeed = avgEasySpeed * 1.25;
-  const predicted10KSecs = 10000 / thresholdSpeed;
+  const raceEfforts = runs
+    .filter(r => r.distance >= 8000 && r.distance <= 13000 && r.average_speed)
+    .sort((a, b) => b.average_speed - a.average_speed);
 
-  const h = Math.floor(predicted10KSecs / 3600);
-  const m = Math.floor((predicted10KSecs % 3600) / 60);
-  const s = Math.round(predicted10KSecs % 60).toString().padStart(2, '0');
-  return h > 0 ? `${h}:${m.toString().padStart(2, '0')}:${s}` : `${m}:${s}`;
+  if (raceEfforts.length > 0) {
+    const best = raceEfforts[0];
+    // Use Riegel's formula: T2 = T1 * (D2/D1)^1.06
+    const actualTime = best.moving_time;
+    const actualDist = best.distance;
+    const targetDist = 10000;
+    const predicted = actualTime * Math.pow(targetDist / actualDist, 1.06);
+    return formatRaceTime(predicted);
+  }
+
+  // Fallback — use recent fast runs (not just easy runs)
+  // Take top 30% of runs by speed to get a realistic pace
+  const recentRuns = runs
+    .filter(r => r.average_speed && r.distance > 3000)
+    .sort((a, b) => b.average_speed - a.average_speed);
+
+  if (recentRuns.length < 2) return null;
+
+  // Use top 3 fastest runs average as threshold estimate
+  const topRuns = recentRuns.slice(0, Math.max(3, Math.ceil(recentRuns.length * 0.3)));
+  const avgFastSpeed = topRuns.reduce((s, r) => s + r.average_speed, 0) / topRuns.length;
+
+  // Apply a conservative race factor (race pace ≈ 90% of best training pace)
+  const racePaceSpeed = avgFastSpeed * 0.90;
+  const predicted10KSecs = 10000 / racePaceSpeed;
+
+  return formatRaceTime(predicted10KSecs);
+}
+
+function formatRaceTime(seconds) {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = Math.round(seconds % 60).toString().padStart(2, '0');
+  if (h > 0) return `${h}:${m.toString().padStart(2, '0')}:${s}`;
+  return `${m}:${s}`;
 }
 
 export function buildCompletedWeeksSummary(weeks, activitiesByWeek) {

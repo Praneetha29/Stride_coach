@@ -35,10 +35,13 @@ router.post('/generate', requireAuth, async (req, res) => {
 router.get('/predictor', requireAuth, async (req, res) => {
   try {
     const result = await pool.query(
-      'SELECT raw_data FROM activities WHERE user_id = $1 ORDER BY start_date DESC LIMIT 30',
+      `SELECT raw_data FROM activities 
+       WHERE user_id = $1 
+       ORDER BY start_date DESC 
+       LIMIT 30`,
       [req.user.id]
     );
-    const runs = result.rows.map(r => r.raw_data);
+    const runs = result.rows.map(r => r.raw_data).filter(Boolean);
     const prediction = predictRaceTime(runs);
     res.json({ prediction });
   } catch (err) {
